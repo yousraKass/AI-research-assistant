@@ -1,3 +1,9 @@
+"""
+note that this doesn't handle rate limiting or retries
+it ignores papers with no abstract 
+future versions will add caching and retry logic to handle 429s from Semantic Scholar
+"""
+
 import httpx
 
 
@@ -38,7 +44,7 @@ def search_papers(query: str, limit: int = 10) -> list[dict]:
         papers.append({
             "paper_id": paper.get("paperId"),
             "title": paper.get("title"),
-            "abstract": paper.get("abstract"),
+            "abstract": paper.get("abstract") or "",
             "authors": [a.get("name") for a in paper.get("authors", [])],
             "year": paper.get("year"),
             "citation_count": paper.get("citationCount"),
