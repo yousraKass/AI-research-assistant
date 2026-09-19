@@ -1,1 +1,14 @@
 /venv
+# Backend virtualenvs
+backend/venv/
+
+# Environment files
+.env
+.env.*
+
+# Python caches
+__pycache__/
+.pytest_cache/
+
+# OS files
+.DS_Store
