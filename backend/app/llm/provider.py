@@ -4,16 +4,48 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# lazy import prompt loader to avoid import cycles if not present
+try:
+    from .prompt_loader import load_prompt
+except Exception:
+    load_prompt = None
+
 client = OpenAI(
     api_key=os.getenv("OPENROUTER_API_KEY"),
     base_url="https://openrouter.ai/api/v1",
 )
 
 
+def _mock_summary(text: str, prompt: str = None) -> str:
+    return "[MOCK SUMMARY] No input text provided."
+   
+
+
 def summarize(text: str, prompt_template: str) -> str:
+    """Summarize `text` using `prompt_template`.
+
+    `prompt_template` can be either a literal prompt string or the name
+    of a prompt file (without extension) located in `app/llm/prompts/`.
+    If the environment variable `LLM_MODEL` is set to `mock`, this returns
+    a deterministic local mock summary without making network requests.
+    """
+    model = os.getenv("LLM_MODEL", "")
+
+    # If prompt_template is a prompt name, try to load it
+    if load_prompt is not None:
+        try:
+            prompt_template = load_prompt(prompt_template, text=text)
+        except FileNotFoundError:
+            # treat prompt_template as literal
+            pass
+
+    # explicit mock mode
+    if model == "mock":
+        return _mock_summary(text, prompt_template)
+
     try:
         response = client.chat.completions.create(
-            model=os.getenv("LLM_MODEL"),
+            model=model or os.getenv("LLM_DEFAULT_MODEL"),
             messages=[
                 {"role": "system", "content": prompt_template},
                 {"role": "user", "content": text},
@@ -26,10 +58,4 @@ def summarize(text: str, prompt_template: str) -> str:
 
     except Exception as e:
         print(f"LLM request failed: {e}")
-        return (
-            "[MOCK SUMMARY]\n\n"
-            "This is a fallback summary because the LLM service "
-            "was unavailable.\n\n"
-            f"The provided text contains approximately {len(text.split())} words "
-            "and could not be summarized by the configured LLM, this mock summary is for testing purposes only."
-        )
+        return _mock_summary(text, prompt_template)
