@@ -1,0 +1,19 @@
+.pipeline-status .stage {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #6c757d;
+}
+.pipeline-status .stage .stage-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ddd;
+}
+.pipeline-status .stage.active {
+  color: var(--bs-primary);
+  font-weight: 600;
+}
+.pipeline-status .stage.active .stage-dot {
+  background: var(--bs-primary);
+}
