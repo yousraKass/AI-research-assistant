@@ -1,11 +1,35 @@
-from typing import List
+from typing import List, Optional
 import json
 import logging
+
+from pydantic import BaseModel, Field
 
 from . import papers as papers_service
 from ..llm import provider
 
 logger = logging.getLogger(__name__)
+
+
+class PaperSource(BaseModel):
+    title: Optional[str] = None
+    authors: List[str] = Field(default_factory=list)
+    year: Optional[int] = None
+    url: Optional[str] = None
+
+
+class PaperSummary(BaseModel):
+    title: Optional[str] = None
+    summary: str = ''
+    url: Optional[str] = None
+
+
+class ResearchReport(BaseModel):
+    research_question: str
+    sources: List[PaperSource] = Field(default_factory=list)
+    paper_summaries: List[PaperSummary] = Field(default_factory=list)
+    common_findings: str = ''
+    differences: str = ''
+    limitations: str = ''
 
 
 def _unique_papers(papers: List[dict]) -> List[dict]:
@@ -21,6 +45,42 @@ def _unique_papers(papers: List[dict]) -> List[dict]:
         seen.add(key)
         out.append(p)
     return out
+
+
+def _parse_synthesis(raw: str) -> dict:
+    if not raw:
+        return {
+            'common_findings': '',
+            'differences': '',
+            'limitations': '',
+        }
+
+    try:
+        parsed = json.loads(raw)
+    except Exception:
+        import re
+
+        match = re.search(r"\{[\s\S]*\}", raw)
+        if not match:
+            return {
+                'common_findings': raw,
+                'differences': '',
+                'limitations': '',
+            }
+        parsed = json.loads(match.group(0))
+
+    if isinstance(parsed, dict):
+        return {
+            'common_findings': str(parsed.get('common_findings') or ''),
+            'differences': str(parsed.get('differences') or ''),
+            'limitations': str(parsed.get('limitations') or ''),
+        }
+
+    return {
+        'common_findings': str(raw),
+        'differences': '',
+        'limitations': '',
+    }
 
 
 def research(query: str, limit: int = 6) -> dict:
@@ -48,6 +108,16 @@ def research(query: str, limit: int = 6) -> dict:
     # limit to requested number
     selected = unique[:limit]
 
+    if not selected:
+        return ResearchReport(
+            research_question=query,
+            sources=[],
+            paper_summaries=[],
+            common_findings='No relevant papers with usable abstracts were found for this query.',
+            differences='',
+            limitations='No paper-level evidence was available for synthesis.',
+        ).model_dump()
+
     sources = []
     paper_summaries = []
 
@@ -65,7 +135,6 @@ def research(query: str, limit: int = 6) -> dict:
             'url': url,
         })
 
-        # Summarize individual paper using the project's LLM provider.
         try:
             summary = provider.summarize(abstract, 'paper_summarization')
         except Exception as e:
@@ -78,53 +147,26 @@ def research(query: str, limit: int = 6) -> dict:
             'url': url,
         })
 
-    # Prepare synthesis prompt: ask the LLM to synthesize only from summaries.
     summaries_text = '\n\n'.join([f"Title: {s['title']}\nSummary: {s['summary']}" for s in paper_summaries])
 
-    # Use the synthesis prompt template via prompt loader (provider supports loading by name)
-    synthesis_input = summaries_text
     try:
-        synth_raw = provider.summarize(synthesis_input, 'synthesis_prompt')
+        synth_raw = provider.summarize(summaries_text, 'synthesis_prompt')
     except Exception as e:
         logger.exception('Synthesis LLM call failed: %s', e)
         synth_raw = ''
 
-    common_findings = ''
-    differences = ''
-    limitations = ''
+    synthesis = _parse_synthesis(synth_raw)
+    common_findings = synthesis['common_findings'] or 'No shared findings could be confidently extracted from the summarized papers.'
+    differences = synthesis['differences'] or 'No substantive disagreements or method differences were explicitly identified in the supplied summaries.'
+    limitations = synthesis['limitations'] or 'No explicit limitations were identified in the supplied paper summaries.'
 
-    # try to parse JSON from the LLM output
-    try:
-        # The model should return JSON — try to find a JSON blob
-        parsed = None
-        try:
-            parsed = json.loads(synth_raw)
-        except Exception:
-            # try to locate a JSON substring
-            import re
+    result = ResearchReport(
+        research_question=query,
+        sources=[PaperSource(**s) for s in sources],
+        paper_summaries=[PaperSummary(**s) for s in paper_summaries],
+        common_findings=common_findings,
+        differences=differences,
+        limitations=limitations,
+    )
 
-            m = re.search(r"\{[\s\S]*\}", synth_raw)
-            if m:
-                parsed = json.loads(m.group(0))
-
-        if isinstance(parsed, dict):
-            common_findings = parsed.get('common_findings') or parsed.get('common_findings', '')
-            differences = parsed.get('differences') or parsed.get('differences', '')
-            limitations = parsed.get('limitations') or parsed.get('limitations', '')
-        else:
-            # fallback: put entire synthesis text into common_findings
-            common_findings = synth_raw or ''
-    except Exception:
-        logger.exception('Failed to parse synthesis output; returning raw text')
-        common_findings = synth_raw or ''
-
-    result = {
-        'research_question': query,
-        'sources': sources,
-        'paper_summaries': paper_summaries,
-        'common_findings': common_findings,
-        'differences': differences,
-        'limitations': limitations,
-    }
-
-    return result
+    return result.model_dump()

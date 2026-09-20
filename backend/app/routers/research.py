@@ -17,6 +17,7 @@ async def run_research(body: ResearchRequest = Body(...)):
     try:
         result = research_service.research(body.query, limit=body.limit)
         return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        # Keep HTTP-specific handling here
         raise HTTPException(status_code=500, detail=str(e))

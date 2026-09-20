@@ -17,7 +17,8 @@ client = OpenAI(
 
 
 def _mock_summary(text: str, prompt: str = None) -> str:
-    return "[MOCK SUMMARY] No input text provided."
+    # I will make it more informative later on 
+    return f"[MOCK SUMMARY] {text[:60]}..."
    
 
 

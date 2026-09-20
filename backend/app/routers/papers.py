@@ -1,18 +1,7 @@
 from fastapi import APIRouter, Query, HTTPException
-from typing import List
-import hashlib
-import json
-import os
-from pathlib import Path
-
 import httpx
 
 from ..services import papers as papers_service
-
-
-# simple on-disk cache directory (backend/cache)
-CACHE_DIR = Path(__file__).resolve().parents[1].parent / 'cache'
-CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 router = APIRouter()

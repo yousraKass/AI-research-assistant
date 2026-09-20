@@ -50,6 +50,28 @@ def _cache_set(key: str, obj):
                 pass
 
 
+def _normalize_authors(authors):
+    if not authors:
+        return []
+    out = []
+    for author in authors:
+        if isinstance(author, dict):
+            name = author.get('name') or author.get('full_name') or author.get('author')
+            if name:
+                out.append(name)
+        elif isinstance(author, str):
+            out.append(author)
+    return out
+
+
+def _normalize_result(result):
+    if not isinstance(result, dict):
+        return result
+    normalized = dict(result)
+    normalized['authors'] = _normalize_authors(normalized.get('authors') or [])
+    return normalized
+
+
 def search(query: str, source: str = 'semantic_scholar', limit: int = 10) -> dict:
     """Search papers from selected sources and return normalized response.
 
@@ -62,7 +84,9 @@ def search(query: str, source: str = 'semantic_scholar', limit: int = 10) -> dic
         key = _cache_key(query, source, limit)
         cached = _cache_get(key)
         if cached is not None:
-            return cached
+            normalized_cached = dict(cached)
+            normalized_cached['results'] = [_normalize_result(r) for r in cached.get('results', [])]
+            return normalized_cached
 
         if source in ('semantic_scholar', 'all'):
             ss = semantic_scholar.search_papers(query, limit=limit)
@@ -70,7 +94,7 @@ def search(query: str, source: str = 'semantic_scholar', limit: int = 10) -> dic
                 results.append({
                     'title': p.get('title'),
                     'abstract': p.get('abstract'),
-                    'authors': p.get('authors') or [],
+                    'authors': _normalize_authors(p.get('authors') or []),
                     'year': p.get('year'),
                     'url': p.get('url'),
                     'source': 'semantic_scholar',
@@ -82,7 +106,7 @@ def search(query: str, source: str = 'semantic_scholar', limit: int = 10) -> dic
                 results.append({
                     'title': p.get('title'),
                     'abstract': p.get('abstract'),
-                    'authors': p.get('authors') or [],
+                    'authors': _normalize_authors(p.get('authors') or []),
                     'year': p.get('year'),
                     'url': p.get('url'),
                     'source': 'arxiv',
