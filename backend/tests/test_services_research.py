@@ -51,3 +51,40 @@ def test_research_summarization_and_synthesis(monkeypatch):
     assert len(res['paper_summaries']) == 2
     assert 'Both papers' in res['common_findings'] or res['common_findings']
     assert 'differences' in res or isinstance(res['differences'], str)
+
+
+def test_research_handles_empty_filtered_results(monkeypatch):
+    monkeypatch.setattr(
+        'app.services.papers.search',
+        lambda query, source='semantic_scholar', limit=10: {'query': query, 'source': source, 'results': []}
+    )
+
+    res = research_service.research('empty', limit=3)
+    assert res['research_question'] == 'empty'
+    assert res['sources'] == []
+    assert res['paper_summaries'] == []
+    assert 'No relevant papers' in res['common_findings'] or res['common_findings'] == ''
+
+
+def test_research_handles_malformed_synthesis(monkeypatch):
+    fake_results = {
+        'query': 'q',
+        'source': 'semantic_scholar',
+        'results': [
+            {
+                'title': 'Paper A',
+                'abstract': 'Abstract A about method X and result Y.',
+                'authors': ['Alice'],
+                'year': 2022,
+                'url': 'http://a',
+            }
+        ],
+    }
+
+    monkeypatch.setattr('app.services.papers.search', lambda query, source='semantic_scholar', limit=10: fake_results)
+    monkeypatch.setattr('app.llm.provider.summarize', lambda text, prompt_template: 'not-json-at-all')
+
+    res = research_service.research('some query', limit=1)
+    assert res['common_findings'] == 'not-json-at-all' or 'not-json-at-all' in res['common_findings']
+    assert isinstance(res['differences'], str)
+    assert isinstance(res['limitations'], str)
