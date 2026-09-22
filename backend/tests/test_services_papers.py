@@ -1,6 +1,3 @@
-import json
-from unittest.mock import patch
-
 from app.services import papers as papers_service
 
 
@@ -30,7 +27,11 @@ def test_search_normalizes_semantic_scholar(monkeypatch):
             }
         ]
 
-    monkeypatch.setattr('app.tools.semantic_scholar.search_papers', fake_ss)
+    class FakeTool:
+        def invoke(self, payload):
+            return fake_ss(payload['query'], payload['limit'])
+
+    monkeypatch.setattr('app.services.papers.search_semantic_scholar', FakeTool())
 
     res = papers_service.search('test query', source='semantic_scholar', limit=1)
     assert res['query'] == 'test query'

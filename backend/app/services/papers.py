@@ -6,8 +6,7 @@ import logging
 
 import httpx
 
-from ..tools import semantic_scholar
-from ..tools import arxiv as arxiv_tool
+from ..tools.search_tools import search_arxiv, search_semantic_scholar
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +88,7 @@ def search(query: str, source: str = 'semantic_scholar', limit: int = 10) -> dic
             return normalized_cached
 
         if source in ('semantic_scholar', 'all'):
-            ss = semantic_scholar.search_papers(query, limit=limit)
+            ss = search_semantic_scholar.invoke({'query': query, 'limit': limit})
             for p in ss:
                 results.append({
                     'title': p.get('title'),
@@ -101,7 +100,7 @@ def search(query: str, source: str = 'semantic_scholar', limit: int = 10) -> dic
                 })
 
         if source in ('arxiv', 'all'):
-            ax = arxiv_tool.search_papers(query, limit=limit)
+            ax = search_arxiv.invoke({'query': query, 'limit': limit})
             for p in ax:
                 results.append({
                     'title': p.get('title'),

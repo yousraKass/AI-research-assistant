@@ -1,5 +1,3 @@
-import json
-
 from app.tools.search_tools import (
     get_paper,
     search_arxiv,

@@ -12,25 +12,51 @@ ARXIV_API = "https://export.arxiv.org/api/query"
 DUCKDUCKGO_HTML = "https://duckduckgo.com/html/"
 
 
-def _normalize_semantic_paper(paper: dict) -> dict:
+def _normalize_authors(author_items) -> list[str]:
     authors = []
-    for author in paper.get("authors", []) or []:
+    for author in author_items or []:
         if isinstance(author, dict):
             name = author.get("name") or author.get("full_name") or author.get("author")
             if name:
                 authors.append(name)
         elif isinstance(author, str):
             authors.append(author)
+    return authors
 
-    return {
-        "paper_id": paper.get("paperId") or paper.get("paper_id"),
-        "title": paper.get("title"),
-        "abstract": paper.get("abstract") or "",
-        "authors": authors,
-        "year": paper.get("year"),
-        "citation_count": paper.get("citationCount"),
-        "url": paper.get("url"),
+
+def _paper_record(
+    *,
+    title=None,
+    abstract=None,
+    authors=None,
+    year=None,
+    url=None,
+    paper_id=None,
+    citation_count=None,
+) -> dict:
+    record = {
+        "paper_id": paper_id,
+        "title": title,
+        "abstract": abstract or "",
+        "authors": _normalize_authors(authors),
+        "year": year,
+        "url": url,
     }
+    if citation_count is not None:
+        record["citation_count"] = citation_count
+    return record
+
+
+def _normalize_semantic_paper(paper: dict) -> dict:
+    return _paper_record(
+        paper_id=paper.get("paperId") or paper.get("paper_id"),
+        title=paper.get("title"),
+        abstract=paper.get("abstract"),
+        authors=paper.get("authors", []) or [],
+        year=paper.get("year"),
+        url=paper.get("url"),
+        citation_count=paper.get("citationCount"),
+    )
 
 
 @tool
@@ -82,13 +108,13 @@ def search_arxiv(query: str, limit: int = 5) -> list[dict]:
             except ValueError:
                 year = None
 
-        results.append({
-            "title": title.text.strip() if title is not None and title.text else None,
-            "abstract": summary.text.strip() if summary is not None and summary.text else None,
-            "authors": authors,
-            "year": year,
-            "url": link,
-        })
+        results.append(_paper_record(
+            title=title.text.strip() if title is not None and title.text else None,
+            abstract=summary.text.strip() if summary is not None and summary.text else None,
+            authors=authors,
+            year=year,
+            url=link,
+        ))
 
     return results
 

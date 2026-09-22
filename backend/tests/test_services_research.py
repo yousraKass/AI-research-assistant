@@ -1,5 +1,4 @@
 import json
-from unittest.mock import patch
 
 from app.services import research as research_service
 

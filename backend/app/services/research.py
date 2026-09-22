@@ -1,5 +1,4 @@
 from typing import List, Optional
-import json
 import logging
 
 from pydantic import BaseModel, Field
@@ -72,36 +71,8 @@ def _parse_synthesis(raw) -> dict:
             'limitations': str(raw.get('limitations') or ''),
         }
 
-    if not raw:
-        return {
-            'common_findings': '',
-            'differences': '',
-            'limitations': '',
-        }
-
-    try:
-        parsed = json.loads(raw)
-    except Exception:
-        import re
-
-        match = re.search(r"\{[\s\S]*\}", str(raw))
-        if not match:
-            return {
-                'common_findings': str(raw),
-                'differences': '',
-                'limitations': '',
-            }
-        parsed = json.loads(match.group(0))
-
-    if isinstance(parsed, dict):
-        return {
-            'common_findings': str(parsed.get('common_findings') or ''),
-            'differences': str(parsed.get('differences') or ''),
-            'limitations': str(parsed.get('limitations') or ''),
-        }
-
     return {
-        'common_findings': str(raw),
+        'common_findings': '',
         'differences': '',
         'limitations': '',
     }

@@ -13,15 +13,3 @@ def load_prompt_template(name: str) -> ChatPromptTemplate:
 
     text = path.read_text(encoding='utf-8')
     return ChatPromptTemplate.from_template(text)
-
-
-def load_prompt(name: str, **kwargs) -> str:
-    """Backward-compatible helper to render a prompt template to a plain string."""
-    template = load_prompt_template(name)
-    prompt = template.invoke(kwargs)
-    return prompt.to_string()
-
-
-def render_prompt(name: str, **kwargs) -> str:
-    """Render a prompt template with the provided values."""
-    return load_prompt(name, **kwargs)
