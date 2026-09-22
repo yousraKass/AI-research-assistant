@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from . import papers as papers_service
 from ..llm import provider
+from ..llm.prompt_loader import load_prompt_template
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,12 @@ class ResearchReport(BaseModel):
     limitations: str = ''
 
 
+class SynthesisResult(BaseModel):
+    common_findings: str = ''
+    differences: str = ''
+    limitations: str = ''
+
+
 def _unique_papers(papers: List[dict]) -> List[dict]:
     seen = set()
     out = []
@@ -47,7 +54,24 @@ def _unique_papers(papers: List[dict]) -> List[dict]:
     return out
 
 
-def _parse_synthesis(raw: str) -> dict:
+def _parse_synthesis(raw) -> dict:
+    if raw is None:
+        return {
+            'common_findings': '',
+            'differences': '',
+            'limitations': '',
+        }
+
+    if isinstance(raw, BaseModel):
+        raw = raw.model_dump()
+
+    if isinstance(raw, dict):
+        return {
+            'common_findings': str(raw.get('common_findings') or ''),
+            'differences': str(raw.get('differences') or ''),
+            'limitations': str(raw.get('limitations') or ''),
+        }
+
     if not raw:
         return {
             'common_findings': '',
@@ -60,10 +84,10 @@ def _parse_synthesis(raw: str) -> dict:
     except Exception:
         import re
 
-        match = re.search(r"\{[\s\S]*\}", raw)
+        match = re.search(r"\{[\s\S]*\}", str(raw))
         if not match:
             return {
-                'common_findings': raw,
+                'common_findings': str(raw),
                 'differences': '',
                 'limitations': '',
             }
@@ -148,17 +172,21 @@ def research(query: str, limit: int = 6) -> dict:
         })
 
     summaries_text = '\n\n'.join([f"Title: {s['title']}\nSummary: {s['summary']}" for s in paper_summaries])
+    synthesis_template = load_prompt_template('synthesis_prompt')
 
     try:
-        synth_raw = provider.summarize(summaries_text, 'synthesis_prompt')
+        synth_result = provider.summarize_structured(summaries_text, synthesis_template, schema=SynthesisResult)
+        synthesis = _parse_synthesis(synth_result)
     except Exception as e:
-        logger.exception('Synthesis LLM call failed: %s', e)
-        synth_raw = ''
-
-    synthesis = _parse_synthesis(synth_raw)
-    common_findings = synthesis['common_findings'] or 'No shared findings could be confidently extracted from the summarized papers.'
-    differences = synthesis['differences'] or 'No substantive disagreements or method differences were explicitly identified in the supplied summaries.'
-    limitations = synthesis['limitations'] or 'No explicit limitations were identified in the supplied paper summaries.'
+        logger.exception('Structured synthesis LLM call failed: %s', e)
+        synthesis = {
+            'common_findings': '',
+            'differences': '',
+            'limitations': '',
+        }
+    common_findings = synthesis['common_findings']
+    differences = synthesis['differences']
+    limitations = synthesis['limitations']
 
     result = ResearchReport(
         research_question=query,
