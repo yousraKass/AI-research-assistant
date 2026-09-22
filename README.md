@@ -1,4 +1,4 @@
-# AI Research Assistant Agent
+# AI Research Assistant 
 
 A research assistant that takes a question, searches academic papers, summarizes them, identifies gaps, and returns a structured review draft. The current implementation is a FastAPI backend with LangChain-based LLM utilities and a React frontend for search, polling, and results rendering.
 
