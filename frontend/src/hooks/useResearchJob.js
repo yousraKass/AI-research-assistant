@@ -41,14 +41,10 @@ export default function useResearchJob(initialJobId = null) {
   }, [pollOnce])
 
   useEffect(() => {
-    if (initialJobId) {
-      setJobId(initialJobId)
-      startPolling(initialJobId)
-    }
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current)
     }
-  }, [initialJobId, startPolling])
+  }, [])
 
   const start = useCallback(async (query) => {
     setError(null)

@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Row, Col, Spinner, Button } from 'react-bootstrap'
+import { Spinner, Button } from 'react-bootstrap'
 import useResearchJob from '../hooks/useResearchJob'
 import PipelineStatus from '../components/PipelineStatus'
 import ClusterSection from '../components/ClusterSection'
